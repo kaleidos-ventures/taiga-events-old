@@ -1,7 +1,7 @@
 import amqp
 import asyncio
 
-from consumer import make_rabbitmq_connection
+from taiga_events.consumer import make_rabbitmq_connection
 
 @asyncio.coroutine
 def make_rabbitmq_channel(conn, *, routing_key="", type="fanout"):

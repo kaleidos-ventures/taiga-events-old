@@ -65,8 +65,8 @@ def connect(dsn=None, *, loop=None):
     if loop is None:
         loop = asyncio.get_event_loop()
 
-    conn = psycopg2.connect(
-        dsn=dsn,
-        cursor_factory=functools.partial(Cursor, loop=loop), async=1)
+    cursorfn = functools.partial(Cursor, loop=loop)
+    conn = psycopg2.connect(dsn=dsn, cursor_factory=cursorfn, async=1)
+
     yield from wait(conn, loop)
     return conn
