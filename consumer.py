@@ -90,8 +90,6 @@ def subscribe(*, url, buffer_size=10):
     def _on_rcvloop_done(*args):
         print("RCVLOOP DONE", args)
 
-    print("KKK")
-
     # Run message receiver
     rcvloop = asyncio.Task(_receive_messages_loop(conn, rq, queue, stop_event))
     rcvloop.add_done_callback(_on_rcvloop_done)
