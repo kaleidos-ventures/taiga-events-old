@@ -19,7 +19,7 @@ def emiter_loop(*, url):
     conn = yield from make_rabbitmq_connection(url=url)
     chan = yield from make_rabbitmq_channel(conn)
 
-    for x in range(10):
+    for x in range(10000):
         print("Sleep...")
         yield from asyncio.sleep(1)
         print("Publish: {}".format(x))

@@ -69,9 +69,10 @@ def _receive_messages_loop(conn, rq, queue, event):
         while not event.is_set():
             try:
                 yield from asyncio.sleep(1)
+                print("qsize", queue.qsize())
                 conn.drain_events(timeout=0.2)
             except socket.timeout:
-                pass
+                print("timeout")
 
     except Exception as e:
         traceback.print_exc(file=sys.stdout)
@@ -99,6 +100,7 @@ def subscribe(*, url, buffer_size=10):
 @asyncio.coroutine
 def consume_message(subscription):
     (conn, rq, queue, event) = subscription
+    print("consume_message", queue, queue.qsize())
     return (yield from queue.get())
 
 @asyncio.coroutine
