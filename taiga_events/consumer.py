@@ -61,6 +61,7 @@ def close_rabbitmq_queue(queue:RabbitQueue) -> None:
 @asyncio.coroutine
 def _receive_messages_loop(conn, rq, queue, event):
     (channel, queue_name) = (rq.channel, rq.name)
+    print(1)
 
     receive_cb = lambda m: asyncio.Task(queue.put(m.body))
     channel.basic_consume(queue_name, callback=receive_cb)
