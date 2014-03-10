@@ -1,18 +1,7 @@
 import amqp
 import asyncio
 
-from taiga_events.consumer import make_rabbitmq_connection
-
-@asyncio.coroutine
-def make_rabbitmq_channel(conn, *, routing_key="", type="fanout"):
-    """
-    Given a connection and routing key, declare new queue and
-    new exchange and return it.
-    """
-    channel = conn.channel()
-    channel.exchange_declare("events", type)
-
-    return channel
+from taiga_events.consumer import make_rabbitmq_connection, make_rabbitmq_channel
 
 @asyncio.coroutine
 def emiter_loop(*, url):
