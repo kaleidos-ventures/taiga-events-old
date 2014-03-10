@@ -7,40 +7,11 @@ from tornado.platform.asyncio import AsyncIOMainLoop
 AsyncIOMainLoop().install()
 
 from tornado.web import Application
-from tornado.websocket import WebSocketHandler
-
-from .consumer import subscribe, unsubscribe, consume_message
-
-URL = "amqp://guest:guest@127.0.0.1:5672/"
-
-class EventsWebSocket(WebSocketHandler):
-    def initialize(self):
-        self.broker_url = self.application.broker_url
-
-    def open(self):
-        self.event = asyncio.Event()
-
-    @asyncio.coroutine
-    def subscribe(self):
-        subscription = yield from subscribe(url=self.broker_url)
-
-        while not self.event.is_set():
-            message = yield from consume_message(subscription)
-            print("2", message)
-            self.write_message(message)
-
-        yield from unsubscribe(subscription)
-
-    def on_message(self, message):
-        asyncio.Task(self.subscribe())
-
-    def on_close(self):
-        self.event.set()
+from .handler import MainHandler
 
 def make_app(debug=True, broker_url="amqp://guest:guest@127.0.0.1:5672/"):
-    application = Application([(r"/", EventsWebSocket)], debug=debug)
+    application = Application([(r"/", MainHandler)], debug=debug)
     application.broker_url = broker_url
-
     return application
 
 def start_app(application, *, port=8888, join=True):
