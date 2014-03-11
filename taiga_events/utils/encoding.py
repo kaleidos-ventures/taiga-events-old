@@ -13,6 +13,6 @@ def force_text(data):
         return data
 
     if isinstance(data, bytes):
-        return date.decode("utf-8")
+        return data.decode("utf-8")
 
     raise RuntimeException("Invalid type")

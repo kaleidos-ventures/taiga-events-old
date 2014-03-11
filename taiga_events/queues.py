@@ -134,7 +134,6 @@ def subscribe(*, url, buffer_size=10):
     @asyncio.coroutine
     def _receive_messages_loop():
         (channel, queue_name) = (rq.channel, rq.name)
-        print(1)
 
         receive_cb = lambda m: asyncio.Task(queue.put(m.body))
         channel.basic_consume(queue_name, callback=receive_cb)
@@ -199,7 +198,7 @@ def consume(*, url):
 
 if __name__ == "__main__":
     url = "amqp://guest:guest@127.0.0.1:5672/"
-    t = asyncio.Task(consume(url=url))
+    t = asyncio.async(consume(url=url))
 
     loop = asyncio.get_event_loop()
     loop.run_forever()

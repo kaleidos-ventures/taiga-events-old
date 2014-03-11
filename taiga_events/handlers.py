@@ -42,20 +42,20 @@ def serialize_error(error:Exception) -> str:
 ## Main logic
 
 @asyncio.coroutine
-def is_subscription_allowed(repoconf:dict, authmsg:Message) -> bool:
+def is_subscription_allowed(repoconf:dict, authmsg:AuthMsg) -> bool:
     """
     Given a repoconf and parsed authentication message
     instance, and check if it can do make a subscription.
     """
     main_repo = yield from repo.get_repository(repoconf)
     is_allowed = yield from repo.user_is_in_project(main_repo,
-                                                    authmsg.user_id
+                                                    authmsg.user_id,
                                                     authmsg.project_id)
     return is_allowed
 
 
 @asyncio.coroutine
-def authenticate(conf:AppConf, raw_message:str) -> AuthMessage:
+def authenticate(conf:AppConf, raw_message:str) -> AuthMsg:
     """
     Given a appconf and first raw message that works
     as events handshake, try authenticate and test if
@@ -72,7 +72,7 @@ def authenticate(conf:AppConf, raw_message:str) -> AuthMessage:
 
 @asyncio.coroutine
 def build_subscription_pattern(auth_msg:AuthMsg):
-    pass
+    return None
 
 
 @asyncio.coroutine
