@@ -1,0 +1,2 @@
+class InternalException(Exception):
+    pass
