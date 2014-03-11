@@ -155,7 +155,9 @@ class Signer(object):
         if not self.sep in signed_value:
             raise BadSignature('No "%s" found in value' % self.sep)
         value, sig = signed_value.rsplit(self.sep, 1)
-        if constant_time_compare(sig, self.signature(value)):
+
+        if constant_time_compare(force_bytes(sig),
+                                 force_bytes(self.signature(value))):
             return force_text(value)
         raise BadSignature('Signature "%s" does not match' % sig)
 
