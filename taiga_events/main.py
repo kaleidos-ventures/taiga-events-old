@@ -7,7 +7,7 @@ from tornado.platform.asyncio import AsyncIOMainLoop
 AsyncIOMainLoop().install()
 
 from tornado.web import Application
-from .handler import MainHandler
+from .handlers import MainHandler
 
 def make_app(debug=True, broker_url="amqp://guest:guest@127.0.0.1:5672/"):
     application = Application([(r"/", MainHandler)], debug=debug)
