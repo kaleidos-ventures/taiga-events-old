@@ -7,7 +7,7 @@ import hashlib
 from .encoding import force_bytes
 
 def constant_time_compare(val1, val2):
-    """ 
+    """
     Returns True if the two strings are equal, False otherwise.
 
     The time taken is independent of the number of characters that match.
@@ -23,15 +23,15 @@ def constant_time_compare(val1, val2):
     if len(val1) != len(val2):
         return False
 
-    result = 0 
+    result = 0
     for x, y in zip(val1, val2):
-        result |= x ^ y 
+        result |= x ^ y
 
     return result == 0
 
 
 def salted_hmac(key_salt, value, secret):
-    """ 
+    """
     Returns the HMAC-SHA1 of 'value', using a key generated from key_salt and a
     secret (which defaults to settings.SECRET_KEY).
 
