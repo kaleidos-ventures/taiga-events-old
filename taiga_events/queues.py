@@ -184,19 +184,19 @@ def consume_message(subscription):
     return (yield from queue.get())
 
 
-@asyncio.coroutine
-def consume(*, url):
-    subscription = yield from subscribe(url=url)
-
-    while True:
-        message = yield from consume_message(subscription)
-        print("RECEIVED:", message)
-
-        if message == "9":
-            yield from unsubscribe(subscription)
-            break
-
 if __name__ == "__main__":
+    @asyncio.coroutine
+    def consume(*, url):
+        subscription = yield from subscribe(url=url)
+
+        while True:
+            message = yield from consume_message(subscription)
+            print("RECEIVED:", message)
+
+            if message == "9":
+                yield from unsubscribe(subscription)
+                break
+
     url = "amqp://guest:guest@127.0.0.1:5672/"
     t = asyncio.async(consume(url=url))
 

@@ -11,7 +11,11 @@ from .handler import MainHandler
 
 def make_app(debug=True, broker_url="amqp://guest:guest@127.0.0.1:5672/"):
     application = Application([(r"/", MainHandler)], debug=debug)
-    application.broker_url = broker_url
+    application.broker_conf = {"url": broker_url}
+
+    # TODO: temporary hardcoded
+    application.repo_conf = {"dsn": "dbname=test"}
+    application.secret_key = "secretkey"
     return application
 
 def start_app(application, *, port=8888, join=True):
