@@ -7,6 +7,7 @@ from tornado.websocket import WebSocketHandler
 from . import queues
 from . import repository as repo
 from . import signing
+from .exceptions import InternalException
 
 ## Custom types definition
 
