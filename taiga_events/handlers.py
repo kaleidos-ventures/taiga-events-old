@@ -61,10 +61,10 @@ def authenticate(conf:AppConf, raw_message:str) -> AuthMsg:
     as events handshake, try authenticate and test if
     client user cans subscribe to events or not.
     """
-    repoconf, secret_key = conf.repoconf, conf.secret_key
+    repo_conf, secret_key = conf.repo_conf, conf.secret_key
     auth_msg = parse_auth_message(secret_key, raw_message)
 
-    subscription_allowed = yield from is_subscription_allowed(repoconf, auth_msg)
+    subscription_allowed = yield from is_subscription_allowed(repo_conf, auth_msg)
     if not subscription_allowed:
         raise InternalException("subscription not allowed")
     return auth_msg
@@ -101,7 +101,7 @@ def subscribe(wsconn, app_conf, stop_event):
         sub_pattern = yield from build_subscription_pattern(auth_msg)
         subscription = yield from queues.subscribe(url=app_conf.broker_conf["url"],
                                                    pattern=sub_pattern)
-        while not self.stop_event.is_set():
+        while not stop_event.is_set():
             message = yield from queues.consume_message(subscription)
             wsconn.write_message(message)
 
