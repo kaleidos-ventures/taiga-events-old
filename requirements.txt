@@ -4,3 +4,4 @@ pytest-xdist==1.9
 tornado==3.2
 amqp==1.4.4
 asyncio==0.4.1
+psycopg2==2.5.2
