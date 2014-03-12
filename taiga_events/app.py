@@ -50,11 +50,14 @@ def serialize_error(error:Exception) -> str:
 
 
 @asyncio.coroutine
-def is_subscription_allowed(appconf:types.AppConf, authmsg:AuthMsg) -> bool:
+def is_subscription_allowed(appconf:types.AppConf, authmsg:types.AuthMsg) -> bool:
     """
     Given a repoconf and parsed authentication message
     instance, and check if it can do make a subscription.
     """
+    assert isinstance(appconf, types.AppConf)
+    assert isinstance(authmsg, types.AuthMsg)
+
     repo_conf = appconf.repo_conf
     main_repo = yield from repo.get_repository(repoconf)
     is_allowed = yield from repo.user_is_in_project(main_repo,
@@ -64,12 +67,15 @@ def is_subscription_allowed(appconf:types.AppConf, authmsg:AuthMsg) -> bool:
 
 
 @asyncio.coroutine
-def authenticate(appconf:types.AppConf, raw_message:str) -> AuthMsg:
+def authenticate(appconf:types.AppConf, raw_message:str) -> types.AuthMsg:
     """
     Given a appconf and first raw message that works
     as events handshake, try authenticate and test if
     client user cans subscribe to events or not.
     """
+    assert isinstance(appconf, types.AppConf)
+    assert isinstance(raw_message, str)
+
     secret_key = appconf.secret_key
     auth_msg = parse_auth_message(secret_key, raw_message)
 
