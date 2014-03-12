@@ -9,10 +9,10 @@ from urllib.parse import urlparse
 from ..protocols import EventsQueueProtocol
 from ..utils import pg
 
-
 PgSubscription = namedtuple("PgSubscription", ["pgconn", "rcvloop", "queue"])
 
 
+@asyncio.coroutine
 def _subscribe(*, dsn:str, buffer_size:int, pattern:str):
     """
     Given a postgresql connection string, buffer_size and
