@@ -7,6 +7,8 @@ import socket
 from collections import namedtuple
 from urllib.parse import urlparse
 
+from ..protocols import EventsQueueProtocol
+
 ## Custom types definition
 
 RabbitQueue = namedtuple("RabbitQueue", ["name", "channel"])
@@ -17,7 +19,7 @@ RabbitSubscription = namedtuple("RabbitSubscription", ["conn", "rq", "queue", "e
 ## for work with asyncio
 
 @asyncio.coroutine
-def make_rabbitmq_connection(*, url):
+def _make_rabbitmq_connection(*, url):
     parse_result = urlparse(url)
 
     # Parse host & user/password
@@ -36,7 +38,7 @@ def make_rabbitmq_connection(*, url):
                            password=password, virtual_host=vhost)
 
 @asyncio.coroutine
-def make_rabbitmq_queue(conn, *, routing_key="", type="fanout", exchange_name="events"):
+def _make_rabbitmq_queue(conn, *, routing_key="", type="fanout", exchange_name="events"):
     """
     Given a connection and routing key, declare new queue and
     new exchange and return it.
@@ -51,7 +53,7 @@ def make_rabbitmq_queue(conn, *, routing_key="", type="fanout", exchange_name="e
     return RabbitQueue(queue_name, channel)
 
 @asyncio.coroutine
-def make_rabbitmq_channel(conn, *, routing_key="", type="fanout", exchange_name="events"):
+def _make_rabbitmq_channel(conn, *, routing_key="", type="fanout", exchange_name="events"):
     """
     Given a connection and routing key, declare new queue and
     new exchange and return it.
@@ -62,12 +64,12 @@ def make_rabbitmq_channel(conn, *, routing_key="", type="fanout", exchange_name=
     return RabbitChannel(channel)
 
 @asyncio.coroutine
-def publish_rabbitmq_message(channel, message, exchange_name="events", routing_key=""):
+def _publish_rabbitmq_message(channel, message, exchange_name="events", routing_key=""):
     (msg, chan) = (amqp.Message(message), channel.channel)
     chan.basic_publish(msg, exchange_name)
 
 @asyncio.coroutine
-def consume_rabbitmq_messages(conn, queue, callback):
+def _consume_rabbitmq_messages(conn, queue, callback):
     assert isinstance(queue, RabbitQueue), "queue should be instance of RabbitQueue"
 
     def _rcv_callback(msg):
@@ -88,7 +90,7 @@ def consume_rabbitmq_messages(conn, queue, callback):
     return asyncio.Task(_rcvloop())
 
 @asyncio.coroutine
-def close_rabbitmq_queue(queue):
+def _close_rabbitmq_queue(queue):
     """
     Given a RabbitQueue instance, close it and return nothing.
     """
@@ -99,7 +101,7 @@ def close_rabbitmq_queue(queue):
     rchannel.close()
 
 @asyncio.coroutine
-def close_rabbitmq_channel(channel):
+def _close_rabbitmq_channel(channel):
     """
     Given a plain amqp channel, try close it.
     """
@@ -109,14 +111,14 @@ def close_rabbitmq_channel(channel):
     rchannel.close()
 
 @asyncio.coroutine
-def close_rabbitmq_connection(conn):
+def _close_rabbitmq_connection(conn):
     conn.close()
 
 
 ## High level interface for consume messages
 
 @asyncio.coroutine
-def subscribe(*, url, buffer_size=10):
+def _subscribe(*, url, buffer_size=10):
     """
     Given rabbitmq connection string as url,
     starts consumer loop and return a subscription
@@ -128,14 +130,14 @@ def subscribe(*, url, buffer_size=10):
     stop_event = asyncio.Event()
 
     # RabbitMQ connection
-    conn = yield from make_rabbitmq_connection(url=url)
-    rq = yield from make_rabbitmq_queue(conn)
+    conn = yield from _make_rabbitmq_connection(url=url)
+    rq = yield from _make_rabbitmq_queue(conn)
 
     @asyncio.coroutine
     def _receive_messages_loop():
         (channel, queue_name) = (rq.channel, rq.name)
 
-        receive_cb = lambda m: asyncio.Task(queue.put(m.body))
+        receive_cb = lambda m: asyncio.async(queue.put(m.body))
         channel.basic_consume(queue_name, callback=receive_cb)
 
         try:
@@ -148,8 +150,7 @@ def subscribe(*, url, buffer_size=10):
                     print("timeout")
 
         except Exception as e:
-            traceback.print_exc(file=sys.stdout)
-            print("Exception raised:", e.__class__, e)
+            traceback.print_exc(file=sys.stderr)
 
     def _on_rcvloop_done(*args):
         print("RCVLOOP DONE", args)
@@ -161,7 +162,7 @@ def subscribe(*, url, buffer_size=10):
     return RabbitSubscription(conn, rq, queue, stop_event)
 
 @asyncio.coroutine
-def unsubscribe(subscription):
+def _close_subscription(subscription):
     """
     Given a subscription, close a related
     rabbitmq queues and connection.
@@ -170,11 +171,11 @@ def unsubscribe(subscription):
     # Set event as resolved
     event.set()
 
-    yield from close_rabbitmq_queue(rq)
-    yield from close_rabbitmq_connection(rconn)
+    yield from _close_rabbitmq_queue(rq)
+    yield from _close_rabbitmq_connection(rconn)
 
 @asyncio.coroutine
-def consume_message(subscription):
+def _consume_message(subscription):
     """
     Given a subscription, try consume one message
     if no message is available on buffer, it blocks
@@ -184,21 +185,23 @@ def consume_message(subscription):
     return (yield from queue.get())
 
 
-if __name__ == "__main__":
+class EventsQueue(EventsQueueProtocol):
+    """
+    Public abstraction.
+    """
+    def __init__(self, url):
+        self.url = url
+
     @asyncio.coroutine
-    def consume(*, url):
-        subscription = yield from subscribe(url=url)
+    def subscribe(self, pattern:str, buffer_size:int=10):
+        return (yield from _subscribe(url=self.url,
+                                      buffer_size=buffer_size,
+                                      pattern=pattern))
 
-        while True:
-            message = yield from consume_message(subscription)
-            print("RECEIVED:", message)
+    @asyncio.coroutine
+    def close_subscription(self, subscription):
+        return (yield from _close_subscription(subscription))
 
-            if message == "9":
-                yield from unsubscribe(subscription)
-                break
-
-    url = "amqp://guest:guest@127.0.0.1:5672/"
-    t = asyncio.async(consume(url=url))
-
-    loop = asyncio.get_event_loop()
-    loop.run_forever()
+    @asyncio.coroutine
+    def consume_message(self, subscription):
+        return (yield from _consume_message(subscription))
