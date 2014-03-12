@@ -30,11 +30,9 @@ def _subscribe(*, dsn:str, buffer_size:int, pattern:str):
 
                     while cnn.notifies:
                         notify = cnn.notifies.pop()
-                        print("NOTIFY: {}".format(notify))
                         yield from queue.put(notify.payload)
-
                 except Exception as e:
-                    traceback.print_exc()
+                    break
 
     rcvloop = asyncio.Task(_receive_messages_loop())
     return PgSubscription(cnn, rcvloop, queue)
