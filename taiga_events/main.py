@@ -23,7 +23,7 @@ def make_app(debug=True, broker_url="amqp://guest:guest@127.0.0.1:5672/"):
 
 def start_app(application, *, port=8888, join=True):
     application.listen(port)
-    print("Now listening on: http://127.0.0.1:8888", file=sys.stderr)
+    print("Now listening on: http://127.0.0.1:{0}".format(port), file=sys.stderr)
 
     if join:
         loop = asyncio.get_event_loop()
