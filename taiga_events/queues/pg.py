@@ -49,7 +49,7 @@ def _close_subscription(subscription):
     cnn, rcvloop, queue = subscription
     rcvloop.cancel()
 
-    # FIXME: can not call close when waiting events
+    pg.wait(cnn)
     cnn.close()
 
 
