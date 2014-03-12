@@ -83,7 +83,7 @@ def authenticate(appconf:types.AppConf, raw_message:str) -> types.AuthMsg:
     if not subscription_allowed:
         raise InternalException("subscription not allowed")
     return auth_msg
-~
+
 
 @asyncio.coroutine
 def build_subscription_pattern(auth_msg:types.AuthMsg):
@@ -91,7 +91,7 @@ def build_subscription_pattern(auth_msg:types.AuthMsg):
 
 
 @asyncio.coroutine
-def subscribe(wsconn:WebSocketConnectionProtocol,
+def subscribe(wsconn:protos.WebSocketConnectionProtocol,
               appconf:types.AppConf,
               stop_event:asyncio.Event):
     """
