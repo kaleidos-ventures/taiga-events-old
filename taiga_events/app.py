@@ -94,8 +94,7 @@ def build_subscription_pattern(auth_msg:types.AuthMsg):
 
 @asyncio.coroutine
 def subscribe(wsconn:protos.WebSocketConnectionProtocol,
-              appconf:types.AppConf,
-              stop_event:asyncio.Event):
+              appconf:types.AppConf):
     """
     Given a web socket connection, AppConf and asyncio stop
     event, forwards messages from broker to web sockets
@@ -103,7 +102,6 @@ def subscribe(wsconn:protos.WebSocketConnectionProtocol,
     """
     assert isinstance(wsconn, protos.WebSocketConnectionProtocol)
     assert isinstance(appconf, types.AppConf)
-    assert isinstance(stop_event, asyncio.Event)
 
     # Load configured implementation for queues
     queues = cs.load_queue_implementation(appconf)
@@ -120,7 +118,7 @@ def subscribe(wsconn:protos.WebSocketConnectionProtocol,
         # Create new subscription and run infinite loop
         # for consume messages.
         subscription = yield from queues.subscribe(sub_pattern)
-        while not stop_event.is_set():
+        while True:
             message = yield from queues.consume_message(subscription)
             wsconn.write(message)
 

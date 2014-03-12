@@ -43,9 +43,6 @@ class MainHandler(WebSocketHandler):
     of any project, websocket is closed.
     """
 
-    def initialize(self):
-        self.stop_event = asyncio.Event()
-
     def on_message(self, raw_message):
         appconf = types.AppConf(self.application.secret_key,
                                 self.application.repo_conf,
@@ -54,10 +51,9 @@ class MainHandler(WebSocketHandler):
         connection_wrapper = WebSocketConnectionWrapper(self)
 
         coro = app.subscribe(wsconn=connection_wrapper,
-                             appconf=appconf,
-                             stop_event=self.stop_event)
-        asyncio.async(coro)
+                             appconf=appconf)
+        self.t = asyncio.Task(coro)
 
     def on_close(self):
-        self.stop_event.set()
+        self.t.cancel()
 
