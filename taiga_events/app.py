@@ -126,11 +126,16 @@ def subscribe(wsconn:protos.WebSocketConnectionProtocol,
         # In any error, write error message
         # and close the web sockets connection.
 
-        traceback.print_exc()
-        wsconn.write(serialize_error(e))
-        wsconn.close()
+        # Websocket connection can raise an other exception
+        # when trying send message throught closed connection.
+        # This try/except ignores these exceptions.
+
+        try:
+            wsconn.write(serialize_error(e))
+            wsconn.close()
+        except Exception as e:
+            pass
 
     finally:
         if subscription:
             yield from queues.close_subscription(subscription)
-
