@@ -20,7 +20,7 @@ def load_class(path):
     return klass
 
 
-def load_queue_class(appconf:tuple):
+def load_queue_implementation(appconf:tuple):
     """
     Load queue implementation for
     current application configuration.

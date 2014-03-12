@@ -1,5 +1,7 @@
 import asyncio
 import json
+import traceback
+
 from collections import namedtuple
 
 from tornado.websocket import WebSocketHandler
@@ -99,20 +101,21 @@ def subscribe(wsconn:protos.WebSocketConnectionProtocol,
     event, forwards messages from broker to web sockets
     matching a subscription.
     """
-    assert isinstance(wsconn, proto.WebSocketConnectionProtocol)
+    assert isinstance(wsconn, protos.WebSocketConnectionProtocol)
     assert isinstance(appconf, types.AppConf)
     assert isinstance(stop_event, asyncio.Event)
 
     # Load configured implementation for queues
     queues = cs.load_queue_implementation(appconf)
+    subscription = None
 
     try:
         # Authenticate the first message.
         # This function can raise exception if authentication is failed.
-        auth_msg = yield from authenticate(appconf, message)
+        #auth_msg = yield from authenticate(appconf, message)
 
         # TODO: this at this momment does nothing
-        sub_pattern = yield from build_subscription_pattern(auth_msg)
+        sub_pattern = yield from build_subscription_pattern(None)
 
         # Create new subscription and run infinite loop
         # for consume messages.
@@ -121,12 +124,15 @@ def subscribe(wsconn:protos.WebSocketConnectionProtocol,
             message = yield from queues.consume_message(subscription)
             wsconn.write(message)
 
-    except (InternalException, AssertionError) as e:
+    except Exception as e:
         # In any error, write error message
         # and close the web sockets connection.
+
+        traceback.print_exc()
         wsconn.write(serialize_error(e))
         wsconn.close()
 
     finally:
-        yield from queues.close_subscription(subscription)
+        if subscription:
+            yield from queues.close_subscription(subscription)
 

@@ -4,6 +4,7 @@ import functools
 import psycopg2
 import psycopg2.extensions
 
+ISOLATION_LEVEL_AUTOCOMMIT = psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT
 
 class Cursor(psycopg2.extensions.cursor):
     def __init__(self, *args, **kw):
@@ -45,11 +46,27 @@ def _wait(loop, fut, registered, conn):
 
 
 @asyncio.coroutine
+def wait_until_ready_read(cnn, loop=None):
+    if loop is None:
+        loop = asyncio.get_event_loop()
+
+    fd = cnn.fileno()
+    ft = asyncio.Future()
+
+    def _ready_read(*args, **kwargs):
+        ft.set_result(cnn)
+        loop.remove_reader(fd)
+
+    loop.add_reader(fd, _ready_read)
+    return ft
+
+
+@asyncio.coroutine
 def wait(conn, loop=None):
     if loop is None:
         loop = asyncio.get_event_loop()
 
-    f = asyncio.Future(loop=loop)
+    waiter = asyncio.Future(loop=loop)
 
     _wait(loop, waiter, False, conn)
     try:

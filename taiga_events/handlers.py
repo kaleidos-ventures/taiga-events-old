@@ -47,15 +47,15 @@ class MainHandler(WebSocketHandler):
         self.stop_event = asyncio.Event()
 
     def on_message(self, raw_message):
-        appconf = types.AppConf(self.application.private_key,
+        appconf = types.AppConf(self.application.secret_key,
                                 self.application.repo_conf,
                                 self.application.queue_conf)
 
         connection_wrapper = WebSocketConnectionWrapper(self)
 
-        coro = subscribe(wsconn=connection_wrapper,
-                         appconf=appconf,
-                         stop_event=self.stop_event)
+        coro = app.subscribe(wsconn=connection_wrapper,
+                             appconf=appconf,
+                             stop_event=self.stop_event)
         asyncio.async(coro)
 
     def on_close(self):
