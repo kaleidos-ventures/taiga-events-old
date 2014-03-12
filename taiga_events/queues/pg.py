@@ -1,10 +1,7 @@
 import traceback
-import sys
 import asyncio
-import socket
 
 from collections import namedtuple
-from urllib.parse import urlparse
 
 from ..protocols import EventsQueueProtocol
 from ..utils import pg
