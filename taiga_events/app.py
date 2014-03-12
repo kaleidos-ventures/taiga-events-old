@@ -8,7 +8,7 @@ from tornado.websocket import WebSocketHandler
 
 from . import repository as repo
 from . import signing
-from . import classloader as cs
+from . import classloader
 from . import protocols as protos
 from . import types
 
@@ -104,7 +104,7 @@ def subscribe(wsconn:protos.WebSocketConnectionProtocol,
     assert isinstance(appconf, types.AppConf)
 
     # Load configured implementation for queues
-    queues = cs.load_queue_implementation(appconf)
+    queues = classloader.load_queue_implementation(appconf)
     subscription = None
 
     try:
