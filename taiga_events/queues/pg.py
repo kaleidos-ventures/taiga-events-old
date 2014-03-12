@@ -18,8 +18,6 @@ def _subscribe(*, dsn:str, buffer_size:int, pattern:str):
     """
     queue = asyncio.Queue(buffer_size)
     cnn = yield from pg.connect(dsn=dsn)
-    #cnn.set_isolation_level(pg.ISOLATION_LEVEL_AUTOCOMMIT)
-    #cnn.autocommit = True
 
     @asyncio.coroutine
     def _receive_messages_loop():
