@@ -96,9 +96,9 @@ def build_subscription_pattern(auth_msg:types.AuthMsg):
 def subscribe(wsconn:protos.WebSocketConnectionProtocol,
               appconf:types.AppConf):
     """
-    Given a web socket connection, AppConf and asyncio stop
-    event, forwards messages from broker to web sockets
-    matching a subscription.
+    Given a web socket connection, and application config,
+    start forwarding messages from queue broker backend to
+    connected client matching a subscription.
     """
     assert isinstance(wsconn, protos.WebSocketConnectionProtocol)
     assert isinstance(appconf, types.AppConf)
