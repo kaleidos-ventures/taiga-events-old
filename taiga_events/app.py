@@ -148,16 +148,15 @@ def subscribe(wsconn:protos.WebSocketConnectionProtocol,
         # Create new subscription and run infinite loop
         # for consume messages.
         subscription = yield from queues.subscribe()
+
         while True:
             msg = yield from queues.consume_message(subscription)
-            # NOTE: this is temporary try/except block
-            try:
-                msg_data = deserialize_data(msg)
-                if match_message_with_patterns(msg, patterns):
-                    msg_to_send = prepare_message(msg_data)
-                    wsconn.write(msg_to_send)
-            except Exception as e:
-                traceback.print_exc()
+            msg_data = deserialize_data(msg)
+
+            if match_message_with_patterns(msg, patterns):
+                msg_to_send = prepare_message(msg_data)
+                wsconn.write(msg_to_send)
+
 
     except Exception as e:
         # In any error, write error message
@@ -166,7 +165,6 @@ def subscribe(wsconn:protos.WebSocketConnectionProtocol,
         # Websocket connection can raise an other exception
         # when trying send message throught closed connection.
         # This try/except ignores these exceptions.
-        traceback.print_exc()
 
         try:
             wsconn.write(serialize_error(e))
