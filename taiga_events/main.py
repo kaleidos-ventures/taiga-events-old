@@ -11,14 +11,14 @@ from .handlers import MainHandler
 
 def make_app(debug=True, broker_url="amqp://guest:guest@127.0.0.1:5672/"):
     application = Application([(r"/events", MainHandler)], debug=debug)
-    application.secret_key = "secretkey"
+    application.secret_key = "mysecret"
 
     # TODO: temporary hardcoded
-    application.repo_conf = {"kwargs": {"dsn": "dbname=test"}}
+    application.repo_conf = {"kwargs": {"dsn": "dbname=taiga"}}
 
     # Event source configuration. Initially for rabbitmq.
     application.queue_conf = {"path": "taiga_events.queues.pg.EventsQueue",
-                              "kwargs": {"dsn": "dbname=test"}}
+                              "kwargs": {"dsn": "dbname=taiga"}}
     return application
 
 def start_app(application, *, port=8888, join=True):

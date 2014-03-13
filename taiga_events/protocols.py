@@ -6,7 +6,7 @@ class EventsQueueProtocol(object, metaclass=abc.ABCMeta):
     """
 
     @abc.abstractmethod
-    def subscribe(self, pattern:str, buffer_size=10):
+    def subscribe(self, buffer_size=10):
         pass
 
     @abc.abstractmethod

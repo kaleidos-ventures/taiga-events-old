@@ -10,12 +10,12 @@ PgSubscription = namedtuple("PgSubscription", ["pgconn", "rcvloop", "queue"])
 
 
 @asyncio.coroutine
-def _subscribe(*, dsn:str, buffer_size:int, pattern:str):
+def _subscribe(*, dsn:str, buffer_size:int):
     """
-    Given a postgresql connection string, buffer_size and
-    subscription pattern, starts the consumer loop and
-    return subscription instance.
+    Given a postgresql connection string and buffer_size,
+    starts the consumer loop and return subscription instance.
     """
+
     queue = asyncio.Queue(buffer_size)
     cnn = yield from pg.connect(dsn=dsn)
 
@@ -75,10 +75,9 @@ class EventsQueue(EventsQueueProtocol):
         self.dsn = dsn
 
     @asyncio.coroutine
-    def subscribe(self, pattern:str, buffer_size:int=10):
-        return (yield from _subscribe(dsn=self.dsn,
-                                      buffer_size=buffer_size,
-                                      pattern=pattern))
+    def subscribe(self, buffer_size:int=10):
+        return (yield from _subscribe(dsn=self.dsn, buffer_size=buffer_size))
+
     @asyncio.coroutine
     def close_subscription(self, subscription):
         return (yield from _close_subscription(subscription))
