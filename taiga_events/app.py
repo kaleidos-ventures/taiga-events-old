@@ -85,10 +85,6 @@ def match_message_with_patterns(message:str, patterns:dict) -> bool:
     return (routing_key in patterns)
 
 
-def prepare_message(message:dict) -> str:
-    return serialize_data(message)
-
-
 @asyncio.coroutine
 def subscribe(wsconn:protos.WebSocketConnectionProtocol,
               appconf:types.AppConf,
@@ -118,8 +114,7 @@ def subscribe(wsconn:protos.WebSocketConnectionProtocol,
             msg_data = deserialize_data(msg)
 
             if match_message_with_patterns(msg, patterns):
-                msg_to_send = prepare_message(msg_data)
-                wsconn.write(msg_to_send)
+                wsconn.write(serialize_data(msg_data)
 
 
     except Exception as e:
