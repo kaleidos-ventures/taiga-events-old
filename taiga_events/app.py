@@ -60,42 +60,6 @@ def serialize_error(error:Exception) -> str:
     return serialize_data({"error": str(error)})
 
 
-# @asyncio.coroutine
-# def is_subscription_allowed(appconf:types.AppConf, authmsg:types.AuthMsg) -> bool:
-#     """
-#     Given a repoconf and parsed authentication message
-#     instance, and check if it can do make a subscription.
-#     """
-#     assert isinstance(appconf, types.AppConf)
-#     assert isinstance(authmsg, types.AuthMsg)
-
-#     repo_conf = appconf.repo_conf
-#     main_repo = yield from repo.get_repository(repoconf)
-#     is_allowed = yield from repo.user_is_in_project(main_repo,
-#                                                     authmsg.user_id,
-#                                                     authmsg.project_id)
-#     return is_allowed
-
-
-# @asyncio.coroutine
-# def authenticate(appconf:types.AppConf, raw_message:str) -> types.AuthMsg:
-#     """
-#     Given a appconf and first raw message that works
-#     as events handshake, try authenticate and test if
-#     client user cans subscribe to events or not.
-#     """
-#     assert isinstance(appconf, types.AppConf)
-#     assert isinstance(raw_message, str)
-
-#     secret_key = appconf.secret_key
-#     auth_msg = parse_auth_message(secret_key, raw_message)
-
-#     subscription_allowed = yield from is_subscription_allowed(appconf, auth_msg)
-#     if not subscription_allowed:
-#         raise InternalException("subscription not allowed")
-#     return auth_msg
-
-
 @asyncio.coroutine
 def build_subscription_patterns(appconf:types.AppConf, auth_msg:types.AuthMsg):
     main_repo = yield from repo.get_repository(appconf)
