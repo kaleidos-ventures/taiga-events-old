@@ -9,9 +9,9 @@ AsyncIOMainLoop().install()
 from tornado.web import Application
 from .handlers import MainHandler
 
-def make_app(debug=True, broker_url="amqp://guest:guest@127.0.0.1:5672/"):
+def make_app(debug:bool=True, secret_key:str=None):
     application = Application([(r"/events", MainHandler)], debug=debug)
-    application.secret_key = "mysecret"
+    application.secret_key = secret_key
 
     # TODO: temporary hardcoded
     application.repo_conf = {"kwargs": {"dsn": "dbname=taiga"}}
@@ -35,7 +35,9 @@ def main():
                         default=8888, help="Set custom port number.")
     parser.add_argument("-d", "--debug", dest="debug", action="store_true",
                         default=False, help="Run with debug mode activeted")
+    parser.add_argument("-s", "--secret-key", dest="secret_key", action="store",
+                        required=True, help="Set secret key")
 
     args = parser.parse_args()
-    app = make_app(debug=args.debug)
+    app = make_app(debug=args.debug, secret_key=args.secret_key)
     return start_app(app, port=args.port)
