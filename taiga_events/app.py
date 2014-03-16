@@ -27,11 +27,7 @@ def parse_auth_message(secret_key:str, message:str) -> types.AuthMsg:
     # Common data validation
     assert "token" in data, "handshake message should contain token"
 
-    try:
-        token_data = signing.loads(data["token"], key=secret_key)
-    except Exception as e:
-        return InternalException(str(e))
-
+    token_data = signing.loads(data["token"], key=secret_key)
     return types.AuthMsg(data["token"], token_data["user_id"])
 
 
