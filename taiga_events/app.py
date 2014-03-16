@@ -26,9 +26,10 @@ def parse_auth_message(secret_key:str, message:str) -> types.AuthMsg:
 
     # Common data validation
     assert "token" in data, "handshake message should contain token"
+    assert "sessionId" in data, "handshake message should contain sessionId"
 
     token_data = signing.loads(data["token"], key=secret_key)
-    return types.AuthMsg(data["token"], token_data["user_id"])
+    return types.AuthMsg(data["token"], token_data["user_id"], data["sessionId"])
 
 
 def deserialize_data(data:str) -> dict:
@@ -80,6 +81,15 @@ def match_message_with_patterns(message:str, patterns:dict) -> bool:
     routing_key = msg["routing_key"]
     return (routing_key in patterns)
 
+def is_same_session(identity, message):
+    current_session_id = identity.session_id
+    message_session_id = message.get("session_id", None)
+
+    if message_session_id is None:
+        return False
+
+    return (current_session_id == message_session_id)
+
 
 @asyncio.coroutine
 def subscribe(wsconn:protos.WebSocketConnectionProtocol,
@@ -109,9 +119,12 @@ def subscribe(wsconn:protos.WebSocketConnectionProtocol,
             msg = yield from queues.consume_message(subscription)
             msg_data = deserialize_data(msg)
 
+            # Filter messages from same session
+            if is_same_session(identity, msg_data):
+                continue
+
             if match_message_with_patterns(msg, patterns):
                 wsconn.write(serialize_data(msg_data))
-
 
     except Exception as e:
         # In any error, write error message
