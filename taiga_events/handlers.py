@@ -46,11 +46,6 @@ class MainHandler(WebSocketHandler):
     of any project, websocket is closed.
     """
 
-    def open(self):
-        global persistent_connections
-        persistent_connections += 1
-        print("New connection! (Total live connections: {})".format(persistent_connections))
-
     def on_message(self, message):
         appconf = types.AppConf(self.application.secret_key,
                                 self.application.repo_conf,
@@ -64,8 +59,5 @@ class MainHandler(WebSocketHandler):
         self.t = asyncio.Task(coro)
 
     def on_close(self):
-        global persistent_connections
-        persistent_connections -= 1
-        print("Closed connection! (Total live connections: {})".format(persistent_connections))
         self.t.cancel()
 
