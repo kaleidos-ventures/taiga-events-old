@@ -110,7 +110,7 @@ def subscribe(wsconn:protos.WebSocketConnectionProtocol,
             msg_data = deserialize_data(msg)
 
             if match_message_with_patterns(msg, patterns):
-                wsconn.write(serialize_data(msg_data)
+                wsconn.write(serialize_data(msg_data))
 
 
     except Exception as e:
