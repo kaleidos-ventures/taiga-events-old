@@ -12,8 +12,6 @@ from . import classloader
 from . import protocols as protos
 from . import types
 
-from .exceptions import InternalException
-
 ## Basic client/server protocol parsing functions.
 
 def parse_auth_message(secret_key:str, message:str) -> types.AuthMsg:
