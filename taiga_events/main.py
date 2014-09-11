@@ -8,7 +8,8 @@ from tornado.platform.asyncio import AsyncIOMainLoop
 AsyncIOMainLoop().install()
 
 from tornado.web import Application
-from .handlers import MainHandler
+from .handlers import EventsHandler
+from .adapter import adapt_handler
 
 
 DEFAULT_CONFIG = {
@@ -19,11 +20,10 @@ DEFAULT_CONFIG = {
 
 
 def make_app(config:dict) -> Application:
-    application = Application([(r"/events", MainHandler)], debug=config["debug"])
-    application.secret_key = config["secret_key"]
-    application.repo_conf = config["repo_conf"]
-    application.queue_conf = config["queue_conf"]
-    return application
+    handlers = [
+       (r"/events", adapt_handler(EventsHandler), {"config": config}),
+    ]
+    return Application(handlers, debug=config["debug"])
 
 
 def start_app(application:Application, *, port:int=8888, join:bool=True):
