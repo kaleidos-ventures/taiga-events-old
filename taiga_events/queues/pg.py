@@ -3,8 +3,8 @@ import asyncio
 
 from collections import namedtuple
 
-from ..protocols import EventsQueueProtocol
-from ..utils import pg
+from taiga_events.queues import base
+from taiga_events.utils import pg
 
 PgSubscription = namedtuple("PgSubscription", ["pgconn", "rcvloop", "queue"])
 
@@ -66,7 +66,7 @@ def _consume_message(subscription):
     return (yield from queue.get())
 
 
-class EventsQueue(EventsQueueProtocol):
+class EventsQueue(base.EventsQueue):
     """
     Public abstraction.
     """

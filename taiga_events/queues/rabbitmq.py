@@ -7,7 +7,7 @@ import socket
 from collections import namedtuple
 from urllib.parse import urlparse
 
-from ..protocols import EventsQueueProtocol
+from taiga_events.queues import base
 
 ## Custom types definition
 
@@ -63,31 +63,31 @@ def _make_rabbitmq_channel(conn, *, routing_key="", type="fanout", exchange_name
 
     return RabbitChannel(channel)
 
-@asyncio.coroutine
-def _publish_rabbitmq_message(channel, message, exchange_name="events", routing_key=""):
-    (msg, chan) = (amqp.Message(message), channel.channel)
-    chan.basic_publish(msg, exchange_name)
+# @asyncio.coroutine
+# def _publish_rabbitmq_message(channel, message, exchange_name="events", routing_key=""):
+#     (msg, chan) = (amqp.Message(message), channel.channel)
+#     chan.basic_publish(msg, exchange_name)
 
-@asyncio.coroutine
-def _consume_rabbitmq_messages(conn, queue, callback):
-    assert isinstance(queue, RabbitQueue), "queue should be instance of RabbitQueue"
-
-    def _rcv_callback(msg):
-        callback(msg.body)
-
-    (channel, queue_name) = (rq.channel, rq.name)
-    channel.basic_consume(queue_name, _rcv_callback)
-
-    @asyncio.coroutine
-    def _rcvloop():
-        while True:
-            try:
-                yield from asyncio.sleep(0.5)
-                conn.drain_events(0.5)
-            except socket.timeout:
-                pass
-
-    return asyncio.Task(_rcvloop())
+# @asyncio.coroutine
+# def _consume_rabbitmq_messages(conn, queue, callback):
+#     assert isinstance(queue, RabbitQueue), "queue should be instance of RabbitQueue"
+#
+#     def _rcv_callback(msg):
+#         callback(msg.body)
+#
+#     (channel, queue_name) = (rq.channel, rq.name)
+#     channel.basic_consume(queue_name, _rcv_callback)
+#
+#     @asyncio.coroutine
+#     def _rcvloop():
+#         while True:
+#             try:
+#                 yield from asyncio.sleep(0.5)
+#                 conn.drain_events(0.5)
+#             except socket.timeout:
+#                 pass
+#
+#     return asyncio.Task(_rcvloop())
 
 @asyncio.coroutine
 def _close_rabbitmq_queue(queue):
@@ -137,6 +137,7 @@ def _subscribe(*, url, buffer_size=10):
     def _receive_messages_loop():
         (channel, queue_name) = (rq.channel, rq.name)
 
+        # TODO: possible bug
         receive_cb = lambda m: asyncio.async(queue.put(m.body))
         channel.basic_consume(queue_name, callback=receive_cb)
 
@@ -158,7 +159,6 @@ def _subscribe(*, url, buffer_size=10):
     # Run message receiver
     rcvloop = asyncio.Task(_receive_messages_loop())
     rcvloop.add_done_callback(_on_rcvloop_done)
-
     return RabbitSubscription(conn, rq, queue, stop_event)
 
 @asyncio.coroutine
@@ -185,7 +185,7 @@ def _consume_message(subscription):
     return (yield from queue.get())
 
 
-class EventsQueue(EventsQueueProtocol):
+class EventsQueue(base.EventsQueue):
     """
     Public abstraction.
     """
