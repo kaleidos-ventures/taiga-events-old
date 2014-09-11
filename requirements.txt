@@ -1,7 +1,6 @@
-pytest==2.5.0
-pytest-cov==1.6
-pytest-xdist==1.9
-tornado==3.2
-amqp==1.4.4
-asyncio==0.4.1
-psycopg2==2.5.2
+pytest==2.6.2
+pytest-cov==1.8
+pytest-xdist==1.10
+tornado==4.0.2
+amqp==1.4.6
+psycopg2==2.5.4
