@@ -35,7 +35,7 @@ def serialize_error(error:Exception) -> str:
 
 
 @asyncio.coroutine
-def parse_auth_message(config:dict, msg:str) -> types.AuthMsg:
+def parse_auth_message(config:dict, message:str) -> types.AuthMsg:
     """
     Parses first message received throught websocket
     connection (auth message).
@@ -92,7 +92,7 @@ def subscribe(config, ws, message):
     connected client matching a subscription.
     """
     # Load configured implementation for queues
-    queues = classloader.load_queue_implementation(appconf)
+    queues = classloader.load_queue_implementation(config)
     subscription = None
 
     try:
