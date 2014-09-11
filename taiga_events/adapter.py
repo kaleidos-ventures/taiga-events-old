@@ -12,11 +12,11 @@ def adapt_handler(handler_cls):
     """
 
     class _tornado_handler_adapter(tws.WebSocketHandler):
-        def __init__(self,  *args, **kwargs):
-            super().__init__(*args, **kwargs)
-
+        def initialize(self, config):
             self.__connection = ws.WebSocketConnection(self)
-            self.__handler = ws.WebSocketHandler()
+            self.__handler = handler_cls()
+            self.__handler.on_initialize(config)
+            super().initialize()
 
         def initialize(self, config):
             self.__handler.on_initialze(config)
