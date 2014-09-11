@@ -1,12 +1,15 @@
 import asyncio
 import json
 import traceback
+import logging
 
 from . import repository as repo
 from . import signing
 from . import classloader
 from . import types
 from . import websocket as ws
+
+log = logging.getLogger("taiga")
 
 
 def deserialize_data(data:str) -> dict:
@@ -106,6 +109,7 @@ def subscribe(config, ws, message):
         while True:
             msg = yield from queues.consume_message(subscription)
             msg_data = deserialize_data(msg)
+            log.debug("Received from queue: %s", msg_data)
 
             # Filter messages from same session
             if is_same_session(identity, msg_data):
@@ -114,6 +118,12 @@ def subscribe(config, ws, message):
             if match_message_with_patterns(msg, patterns):
                 ws.write(serialize_data(msg_data))
 
+    except asyncio.CancelledError:
+        # Raised when connection is closed from browser
+        # side. Nothing todo in this case.
+        log.info("Connection closed from browser.",
+                  exc_info=False, stack_info=False)
+
     except Exception as e:
         # In any error, write error message
         # and close the web sockets connection.
@@ -121,14 +131,13 @@ def subscribe(config, ws, message):
         # Websocket connection can raise an other exception
         # when trying send message throught closed connection.
         # This try/except ignores these exceptions.
-        print("DEBUG1:", type(e), e)
+        log.error("Unhandled exception", exc_info=True, stack_info=True)
 
         try:
             ws.write(serialize_error(e))
             ws.close()
         except Exception as e:
-            print("DEBUG2:", type(e), e)
-            pass
+            log.error("Unhandled exception", exc_info=True, stack_info=True)
 
     finally:
         if subscription:
@@ -154,14 +163,16 @@ class EventsHandler(ws.WebSocketHandler):
         self.config = config
 
     def on_open(self, ws):
-        self.queues = classloader.load_queue_implementation(self.config)
+        log.debug("Websocket connection opened: %s", ws)
         self.t = None
 
     def on_message(self, ws, message):
+        log.debug("Websocket message received: (%s) %s", ws, message)
         sub = subscribe(self.config, ws, message)
         self.t = asyncio.async(sub)
 
     def on_close(self, ws):
+        log.debug("Websocket connection closed: %s", ws)
         if not self.t:
             return
 
