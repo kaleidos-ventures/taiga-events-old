@@ -169,7 +169,7 @@ class EventsHandler(ws.WebSocketHandler):
     def on_message(self, ws, message):
         log.debug("Websocket message received: (%s) %s", ws, message)
         sub = subscribe(self.config, ws, message)
-        self.t = asyncio.async(sub)
+        self.t = asyncio.Task(sub)
 
     def on_close(self, ws):
         log.debug("Websocket connection closed: %s", ws)
