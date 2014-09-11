@@ -28,7 +28,7 @@ def adapt_handler(handler_cls):
                 asyncio.Task(result)
 
         def on_message(self, message):
-            result = self._handler.on_message(self.__connection, message)
+            result = self.__handler.on_message(self.__connection, message)
             if asyncio.iscoroutine(result):
                 asyncio.Task(result)
 
