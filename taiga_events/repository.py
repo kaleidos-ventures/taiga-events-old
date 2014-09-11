@@ -4,23 +4,17 @@ from collections import namedtuple
 from . import types
 from .utils import pg
 
-Repository = namedtuple("Repository", ["connection", "vendor"])
+Connection = namedtuple("Repository", ["connection", "vendor"])
 
 @asyncio.coroutine
-def get_repository(appconf:types.AppConf) -> Repository:
-    """
-    Given a generic config object, return a new
-    `Storage` instance. Is a database connection
-    abstraction.
-    """
-
-    repo_conf = appconf.repo_conf
+def get_connection(conf:dict) -> Connection:
+    repo_conf = conf["repo_conf"]
     connection = yield from pg.connect(**repo_conf["kwargs"])
-    return Repository(connection, "postgresql")
+    return Connection(connection, "postgresql")
 
 
 @asyncio.coroutine
-def get_user_project_id_list(repo:Repository, user_id:int) -> [int]:
+def get_user_project_id_list(repo:Connection, user_id:int) -> [int]:
     """
     Given an repository instance and user id, return all project
     id's associated with that user.
