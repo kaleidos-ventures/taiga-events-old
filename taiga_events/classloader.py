@@ -20,13 +20,13 @@ def load_class(path):
     return klass
 
 
-def load_queue_implementation(appconf:tuple):
+def load_queue_implementation(appconf:dict):
     """
     Load queue implementation for
     current application configuration.
     """
 
-    queue_conf = appconf.queue_conf
+    queue_conf = appconf["queue_conf"]
     queue_cls = load_class(queue_conf["path"])
     return queue_cls(**queue_conf["kwargs"])
 
