@@ -18,8 +18,8 @@ def adapt_handler(handler_cls):
             self.__handler.on_initialize(config)
             super().initialize()
 
-        def initialize(self, config):
-            self.__handler.on_initialze(config)
+        def check_origin(self, origin):
+            return True
 
         def open(self):
             self.set_nodelay(True)
