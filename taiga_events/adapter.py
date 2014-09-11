@@ -23,7 +23,7 @@ def adapt_handler(handler_cls):
 
         def open(self):
             self.set_nodelay(True)
-            result = self.__handler.on_open(self.__connection, config)
+            result = self.__handler.on_open(self.__connection)
             if asyncio.iscoroutine(result):
                 asyncio.Task(result)
 
