@@ -1,5 +1,7 @@
 import traceback
 import asyncio
+import logging
+import json
 
 from collections import namedtuple
 
@@ -8,9 +10,11 @@ from taiga_events.utils import pg
 
 PgSubscription = namedtuple("PgSubscription", ["pgconn", "rcvloop", "queue"])
 
+log = logging.getLogger("taiga")
+
 
 @asyncio.coroutine
-def _subscribe(*, dsn:str, buffer_size:int):
+def _subscribe(routing_key, *, dsn:str, buffer_size:int):
     """
     Given a postgresql connection string and buffer_size,
     starts the consumer loop and return subscription instance.
@@ -18,20 +22,24 @@ def _subscribe(*, dsn:str, buffer_size:int):
 
     queue = asyncio.Queue(buffer_size)
     cnn = yield from pg.connect(dsn=dsn)
+    routing_key = routing_key.replace(".", "__")
 
     @asyncio.coroutine
     def _receive_messages_loop():
         with cnn.cursor() as c:
             while True:
                 try:
-                    yield from c.execute("LISTEN events;")
+                    yield from c.execute("LISTEN events_{0};".format(routing_key))
                     yield from pg.wait_until_ready_read(cnn)
                     cnn.poll()
 
                     while cnn.notifies:
                         notify = cnn.notifies.pop()
-                        yield from queue.put(notify.payload)
+                        message = json.loads(notify.payload)
+
+                        yield from queue.put(message)
                 except Exception as e:
+                    log.error(e)
                     break
 
     rcvloop = asyncio.Task(_receive_messages_loop())
@@ -75,8 +83,8 @@ class EventsQueue(base.EventsQueue):
         self.dsn = dsn
 
     @asyncio.coroutine
-    def subscribe(self, buffer_size:int=10):
-        return (yield from _subscribe(dsn=self.dsn, buffer_size=buffer_size))
+    def subscribe(self, routing_key:str, buffer_size:int=10):
+        return (yield from _subscribe(routing_key, dsn=self.dsn, buffer_size=buffer_size))
 
     @asyncio.coroutine
     def close_subscription(self, subscription):

@@ -37,47 +37,6 @@ def serialize_error(error:Exception) -> str:
     return serialize_data({"error": str(error)})
 
 
-@asyncio.coroutine
-def parse_auth_message(config:dict, message:str) -> types.AuthMsg:
-    """
-    Parses first message received throught websocket
-    connection (auth message).
-    """
-    data = deserialize_data(message)
-
-    # Common data validation
-    assert "token" in data, "handshake message should contain token"
-    assert "sessionId" in data, "handshake message should contain sessionId"
-
-    token_data = signing.loads(data["token"], key=config["secret_key"])
-    return types.AuthMsg(data["token"], token_data["user_id"], data["sessionId"])
-
-
-@asyncio.coroutine
-def build_subscription_patterns(config:dict, auth_msg:types.AuthMsg) -> dict:
-    conn = yield from repo.get_connection(config)
-    projects = yield from repo.get_user_project_id_list(conn, auth_msg.user_id)
-    return {"project.{}".format(x) for x in projects}
-
-
-def match_message_with_patterns(message:str, patterns:dict) -> bool:
-    """
-    Given a message and patterns dict structure, try find
-    a message routing_key on patterns. If it found return True,
-    else returns False.
-    """
-    try:
-        msg = deserialize_data(message)
-    except Exception as e:
-        return False
-
-    if "routing_key" not in msg:
-        return False
-
-    routing_key = msg["routing_key"]
-    return (routing_key in patterns)
-
-
 def is_same_session(identity:types.AuthMsg, message:dict) -> bool:
     current_session_id = identity.session_id
     message_session_id = message.get("session_id", None)
@@ -87,61 +46,153 @@ def is_same_session(identity:types.AuthMsg, message:dict) -> bool:
     return (current_session_id == message_session_id)
 
 
-@asyncio.coroutine
-def subscribe(config, ws, message):
-    """
-    Given a web socket connection, and application config,
-    start forwarding messages from queue broker backend to
-    connected client matching a subscription.
-    """
-    # Load configured implementation for queues
-    queues = classloader.load_queue_implementation(config)
-    subscription = None
+class Subscription(object):
+    def __init__(self, identity, config, ws):
+        self.identity = identity
+        self.config = config
+        self.ws = ws
+        self.loop = None
+        self.routing_key = None
 
-    try:
-        identity = yield from parse_auth_message(config, message)
-        patterns = yield from build_subscription_patterns(config, identity)
+    @asyncio.coroutine
+    def start(self, routing_key):
+        self.routing_key = routing_key
+        self.loop = asyncio.Task(self._subscription_ventilator())
 
-        # Create new subscription and run infinite loop
-        # for consume messages.
-        subscription = yield from queues.subscribe()
+    @asyncio.coroutine
+    def stop(self):
+        if not self.loop:
+            return
 
-        while True:
-            msg = yield from queues.consume_message(subscription)
-            msg_data = deserialize_data(msg)
-            log.debug("Received from queue: %s", msg_data)
+        # if not self.loop.done():
+        self.loop.cancel()
 
-            # Filter messages from same session
-            if is_same_session(identity, msg_data):
-                continue
-
-            if match_message_with_patterns(msg, patterns):
-                ws.write(serialize_data(msg_data))
-
-    except asyncio.CancelledError:
-        # Raised when connection is closed from browser
-        # side. Nothing todo in this case.
-        log.info("Connection closed from browser.",
-                  exc_info=False, stack_info=False)
-
-    except Exception as e:
-        # In any error, write error message
-        # and close the web sockets connection.
-
-        # Websocket connection can raise an other exception
-        # when trying send message throught closed connection.
-        # This try/except ignores these exceptions.
-        log.error("Unhandled exception", exc_info=True, stack_info=True)
+    @asyncio.coroutine
+    def _subscription_ventilator(self):
+        queues = classloader.load_queue_implementation(self.config)
+        sub = yield from queues.subscribe(self.routing_key)
 
         try:
-            ws.write(serialize_error(e))
-            ws.close()
+            while True:
+                msg = yield from queues.consume_message(sub)
+                log.debug("Received message: [%s] - %s -  %s", self.routing_key, str(type(msg)), msg)
+
+                if is_same_session(identity, msg):
+                    # Excplicit context switch
+                    yield from asyncio.sleep(0)
+                    continue
+
+                msg["routing_key"] = self.routing_key
+                msg = json.dumps(msg)
+                self.ws.write(msg)
+
+        except asyncio.CancelledError:
+            # Raised when connection is closed from browser
+            # side. Nothing todo in this case.
+            log.debug("Connection closed from browser.",
+                      exc_info=False, stack_info=False)
+
         except Exception as e:
+            # In any error, write error message
+            # and close the web sockets connection.
+
+            # Websocket connection can raise an other exception
+            # when trying send message throught closed connection.
+            # This try/except ignores these exceptions.
             log.error("Unhandled exception", exc_info=True, stack_info=True)
 
-    finally:
-        if subscription:
-            yield from queues.close_subscription(subscription)
+            try:
+                self.ws.write(serialize_error(e))
+                self.ws.close()
+            except Exception as e:
+                log.error("Unhandled exception", exc_info=True, stack_info=True)
+
+        finally:
+            yield from queues.close_subscription(sub)
+
+
+class ConnectionHandler(object):
+    def __init__(self, ws, config):
+        self.ws = ws
+        self.config = config
+        self.first = True
+        self.subscriptions = {}
+
+    @asyncio.coroutine
+    def close(self):
+        # Closed all subscriptions
+        for name, item in self.subscriptions.items():
+            yield from item.stop()
+
+    @asyncio.coroutine
+    def parse_auth_message(self, message:dict) -> types.AuthMsg:
+        """
+        Parses first message received throught websocket
+        connection (auth message).
+        """
+        # Common data validation
+        assert "token" in message, "handshake message should contain token"
+        assert "sessionId" in message, "handshake message should contain sessionId"
+
+        token_data = signing.loads(message["token"], key=self.config["secret_key"])
+        return types.AuthMsg(message["token"], token_data["user_id"], message["sessionId"])
+
+    @asyncio.coroutine
+    def build_subscription_patterns(self, auth_msg:types.AuthMsg) -> dict:
+        conn = yield from repo.get_connection(self.config)
+        projects = yield from repo.get_user_project_id_list(conn, auth_msg.user_id)
+        return frozenset("project.{}.changes".format(x) for x in projects)
+
+    @asyncio.coroutine
+    def authenticate(self, message:dict):
+        log.debug("Authenticating with: {}".format(message))
+        self.identity = yield from self.parse_auth_message(message)
+        self.patters = yield from self.build_subscription_patterns(self.identity)
+
+    @asyncio.coroutine
+    def add_subscription(self, routing_key):
+        if routing_key not in self.patters:
+            log.warning("Attemt to subscribe to forbidden routing key: {}".format(routing_key))
+            return None
+
+        log.debug("Initializing subsciption to: {}".format(routing_key))
+        subscription = Subscription(self.identity, self.config, self.ws)
+        yield from subscription.start(routing_key)
+        self.subscriptions[routing_key] = subscription
+
+    @asyncio.coroutine
+    def remove_subscription(self, routing_key):
+        if routing_key not in self.patters:
+            log.warning("Attemt to unsubscribe to forbidden routing key: {}".format(routing_key))
+            return None
+
+        if routing_key in self.subscriptions:
+            subscription = self.subscriptions[routing_key]
+            yield from subscriptions.close()
+            del self.subscriptions[routing_key]
+
+    @asyncio.coroutine
+    def add_message(self, message):
+        if self.first:
+            self.first = False
+            yield from self.authenticate(message)
+        else:
+            yield from self.handle_message(message)
+
+    @asyncio.coroutine
+    def handle_message(self, message:dict):
+        cmd = message.get("cmd", None)
+        if not cmd or cmd not in set(["subscribe", "unsubscribe"]):
+            log.warning("Received unexpected message: {}".format(message))
+            return
+
+        if cmd == "subscribe":
+            routing_key = message.get("routing_key", None)
+            yield from self.add_subscription(routing_key)
+        elif cmd == "ubsubscribe":
+            routing_key = message.get("routing_key", None)
+            yield from self.remove_subscription(routing_key)
+
 
 
 class EventsHandler(ws.WebSocketHandler):
@@ -164,17 +215,12 @@ class EventsHandler(ws.WebSocketHandler):
 
     def on_open(self, ws):
         log.debug("Websocket connection opened: %s", ws)
-        self.t = None
+        self.t = ConnectionHandler(ws, self.config)
 
     def on_message(self, ws, message):
-        log.debug("Websocket message received: (%s) %s", ws, message)
-        sub = subscribe(self.config, ws, message)
-        self.t = asyncio.Task(sub)
+        log.debug("Websocket message received: %s", message)
+        asyncio.Task(self.t.add_message(json.loads(message)))
 
     def on_close(self, ws):
         log.debug("Websocket connection closed: %s", ws)
-        if not self.t:
-            return
-
-        self.t.cancel()
-        self.t = None
+        asyncio.Task(self.t.close())
