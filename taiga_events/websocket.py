@@ -7,6 +7,10 @@ class WebSocketConnection(object):
     websocket connection.
     """
 
+    @property
+    def remote_ip(self):
+        return self.handler.request.remote_ip
+
     def __init__(self, handler):
         self.handler = handler
 

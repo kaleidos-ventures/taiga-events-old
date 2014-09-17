@@ -75,7 +75,7 @@ class Subscription(object):
         try:
             while True:
                 msg = yield from queues.consume_message(sub)
-                log.debug("Received message: [%s] - %s -  %s", self.routing_key, str(type(msg)), msg)
+                log.debug("Received message: [%s] - %s", self.routing_key, msg)
 
                 if is_same_session(self.identity, msg):
                     # Excplicit context switch
@@ -115,7 +115,7 @@ class ConnectionHandler(object):
     def __init__(self, ws, config):
         self.ws = ws
         self.config = config
-        self.first = True
+        self.authenticated = False
         self.subscriptions = {}
 
     @asyncio.coroutine
@@ -145,7 +145,7 @@ class ConnectionHandler(object):
 
     @asyncio.coroutine
     def authenticate(self, message:dict):
-        log.debug("Authenticating with: {}".format(message))
+        log.debug("Authenticating peer %s with: %s", self.ws.remote_ip, message)
         self.identity = yield from self.parse_auth_message(message)
         # self.patters = yield from self.build_subscription_patterns(self.identity)
 
@@ -175,18 +175,22 @@ class ConnectionHandler(object):
 
     @asyncio.coroutine
     def add_message(self, message):
-        if self.first:
-            self.first = False
-            yield from self.authenticate(message)
+        cmd = message.get("cmd", None)
+
+        if cmd == "auth":
+            authdata = message.get("data")
+            yield from self.authenticate(authdata)
+            self.authenticated = True
         else:
             yield from self.handle_message(message)
 
     @asyncio.coroutine
     def handle_message(self, message:dict):
-        cmd = message.get("cmd", None)
-        if not cmd or cmd not in set(["subscribe", "unsubscribe"]):
-            log.warning("Received unexpected message: {}".format(message))
+        if not self.authenticated:
+            log.info("Unathenticated message from '%s': %s", self.ws.remote_ip, message)
             return
+
+        cmd = message.get("cmd", None)
 
         if cmd == "subscribe":
             routing_key = message.get("routing_key", None)
@@ -194,6 +198,8 @@ class ConnectionHandler(object):
         elif cmd == "ubsubscribe":
             routing_key = message.get("routing_key", None)
             yield from self.remove_subscription(routing_key)
+        else:
+            log.warning("Received unexpected message from '%s': %s", self.ws.remote_ip, message)
 
 
 class EventsHandler(ws.WebSocketHandler):
@@ -215,13 +221,13 @@ class EventsHandler(ws.WebSocketHandler):
         self.config = config
 
     def on_open(self, ws):
-        log.debug("Websocket connection opened: %s", ws)
+        log.debug("Websocket connection opened from '%s'", ws.remote_ip)
         self.t = ConnectionHandler(ws, self.config)
 
     def on_message(self, ws, message):
-        log.debug("Websocket message received: %s", message)
+        log.debug("Websocket message received from '%s': %s", ws.remote_ip, message)
         asyncio.Task(self.t.add_message(json.loads(message)))
 
     def on_close(self, ws):
-        log.debug("Websocket connection closed: %s", ws)
+        log.debug("Websocket connection closed from '%s'", ws.remote_ip)
         asyncio.Task(self.t.close())
