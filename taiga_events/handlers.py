@@ -99,16 +99,15 @@ class Subscription(object):
             # Websocket connection can raise an other exception
             # when trying send message throught closed connection.
             # This try/except ignores these exceptions.
-            log.error("Unhandled exception", exc_info=True, stack_info=True)
+            log.error("Unhandled exception", exc_info=True, stack_info=False)
 
             try:
                 self.ws.write(serialize_error(e))
                 self.ws.close()
             except Exception as e:
-                log.error("Unhandled exception", exc_info=True, stack_info=True)
+                log.error("Unhandled exception", exc_info=True, stack_info=False)
 
-        finally:
-            yield from queues.close_subscription(sub)
+        yield from queues.close_subscription(sub)
 
 
 class ConnectionHandler(object):
