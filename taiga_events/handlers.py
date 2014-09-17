@@ -64,7 +64,6 @@ class Subscription(object):
         if not self.loop:
             return
 
-        # if not self.loop.done():
         self.loop.cancel()
 
     @asyncio.coroutine
@@ -75,7 +74,8 @@ class Subscription(object):
         try:
             while True:
                 msg = yield from queues.consume_message(sub)
-                log.debug("Received message: [%s] - %s", self.routing_key, msg)
+                log.debug("Received message for %s: [%s] - %s",
+                          self.ws.remote_ip, self.routing_key, msg)
 
                 if is_same_session(self.identity, msg):
                     # Excplicit context switch
@@ -89,7 +89,7 @@ class Subscription(object):
         except asyncio.CancelledError:
             # Raised when connection is closed from browser
             # side. Nothing todo in this case.
-            log.debug("Connection closed from browser.",
+            log.debug("Connection closed by peer %s", self.ws.remote_ip,
                       exc_info=False, stack_info=False)
 
         except Exception as e:
@@ -187,7 +187,7 @@ class ConnectionHandler(object):
     @asyncio.coroutine
     def handle_message(self, message:dict):
         if not self.authenticated:
-            log.info("Unathenticated message from '%s': %s", self.ws.remote_ip, message)
+            log.info("Unathenticated message from %s: %s", self.ws.remote_ip, message)
             return
 
         cmd = message.get("cmd", None)
@@ -199,7 +199,7 @@ class ConnectionHandler(object):
             routing_key = message.get("routing_key", None)
             yield from self.remove_subscription(routing_key)
         else:
-            log.warning("Received unexpected message from '%s': %s", self.ws.remote_ip, message)
+            log.warning("Received unexpected message from %s: %s", self.ws.remote_ip, message)
 
 
 class EventsHandler(ws.WebSocketHandler):
@@ -221,13 +221,13 @@ class EventsHandler(ws.WebSocketHandler):
         self.config = config
 
     def on_open(self, ws):
-        log.debug("Websocket connection opened from '%s'", ws.remote_ip)
+        log.debug("Websocket connection opened from %s", ws.remote_ip)
         self.t = ConnectionHandler(ws, self.config)
 
     def on_message(self, ws, message):
-        log.debug("Websocket message received from '%s': %s", ws.remote_ip, message)
+        log.debug("Websocket message received from %s: %s", ws.remote_ip, message)
         asyncio.Task(self.t.add_message(json.loads(message)))
 
     def on_close(self, ws):
-        log.debug("Websocket connection closed from '%s'", ws.remote_ip)
+        log.debug("Websocket connection closed from %s", ws.remote_ip)
         asyncio.Task(self.t.close())
