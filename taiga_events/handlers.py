@@ -137,23 +137,24 @@ class ConnectionHandler(object):
         token_data = signing.loads(message["token"], key=self.config["secret_key"])
         return types.AuthMsg(message["token"], token_data["user_id"], message["sessionId"])
 
-    @asyncio.coroutine
-    def build_subscription_patterns(self, auth_msg:types.AuthMsg) -> dict:
-        conn = yield from repo.get_connection(self.config)
-        projects = yield from repo.get_user_project_id_list(conn, auth_msg.user_id)
-        return frozenset("project.{}.changes".format(x) for x in projects)
+    # @asyncio.coroutine
+    # def build_subscription_patterns(self, auth_msg:types.AuthMsg) -> dict:
+    #     conn = yield from repo.get_connection(self.config)
+    #     projects = yield from repo.get_user_project_id_list(conn, auth_msg.user_id)
+    #     return frozenset("project.{}.changes".format(x) for x in projects)
 
     @asyncio.coroutine
     def authenticate(self, message:dict):
         log.debug("Authenticating with: {}".format(message))
         self.identity = yield from self.parse_auth_message(message)
-        self.patters = yield from self.build_subscription_patterns(self.identity)
+        # self.patters = yield from self.build_subscription_patterns(self.identity)
 
     @asyncio.coroutine
     def add_subscription(self, routing_key):
-        if routing_key not in self.patters:
-            log.warning("Attemt to subscribe to forbidden routing key: {}".format(routing_key))
-            return None
+        # TODO: improve permissions system
+        # if routing_key not in self.patters:
+        #     log.warning("Attemt to subscribe to forbidden routing key: {}".format(routing_key))
+        #     return None
 
         log.debug("Initializing subsciption to: {}".format(routing_key))
         subscription = Subscription(self.identity, self.config, self.ws)
@@ -162,9 +163,10 @@ class ConnectionHandler(object):
 
     @asyncio.coroutine
     def remove_subscription(self, routing_key):
-        if routing_key not in self.patters:
-            log.warning("Attemt to unsubscribe to forbidden routing key: {}".format(routing_key))
-            return None
+        # TODO: improve permissions system
+        # if routing_key not in self.patters:
+        #     log.warning("Attemt to unsubscribe to forbidden routing key: {}".format(routing_key))
+        #     return None
 
         if routing_key in self.subscriptions:
             subscription = self.subscriptions[routing_key]
@@ -192,7 +194,6 @@ class ConnectionHandler(object):
         elif cmd == "ubsubscribe":
             routing_key = message.get("routing_key", None)
             yield from self.remove_subscription(routing_key)
-
 
 
 class EventsHandler(ws.WebSocketHandler):
