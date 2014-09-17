@@ -10,7 +10,7 @@ from taiga_events.utils import pg
 
 PgSubscription = namedtuple("PgSubscription", ["pgconn", "rcvloop", "queue"])
 
-log = logging.getLogger("taiga")
+log = logging.getLogger("taiga.pg")
 
 
 @asyncio.coroutine
@@ -38,10 +38,17 @@ def _subscribe(routing_key, *, dsn:str, buffer_size:int):
                         message = json.loads(notify.payload)
 
                         yield from queue.put(message)
-                except Exception as e:
-                    log.error(e)
+
+                except asyncio.CancelledError:
+                    # This happens when browser closes the conection
+                    # and we should stop a loop when it happens
                     break
 
+                except Exception as e:
+                    log.error("Unhandled exception", exc_info=True, stack_info=False)
+                    break
+
+    # TODO: add apropiate callback for proper connection close
     rcvloop = asyncio.Task(_receive_messages_loop())
     return PgSubscription(cnn, rcvloop, queue)
 
