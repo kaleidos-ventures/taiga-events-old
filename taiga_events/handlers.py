@@ -77,7 +77,7 @@ class Subscription(object):
                 msg = yield from queues.consume_message(sub)
                 log.debug("Received message: [%s] - %s -  %s", self.routing_key, str(type(msg)), msg)
 
-                if is_same_session(identity, msg):
+                if is_same_session(self.identity, msg):
                     # Excplicit context switch
                     yield from asyncio.sleep(0)
                     continue
