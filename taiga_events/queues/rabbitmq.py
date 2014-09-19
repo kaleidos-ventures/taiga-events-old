@@ -20,15 +20,43 @@ RabbitSubscription = namedtuple("RabbitSubscription", ["conn", "queue", "rcvloop
 ## Low level RabbitMQ connection primitives adapted
 ## for work with asyncio
 
-class EventsQueue(base.EventsQueue):
+
+class Connection(object):
     """
-    Public abstraction.
+    Refcounted AMQP connection abstraction.
     """
-    def __init__(self, url):
-        self.url = url
+
+    def __init__(self, conn):
+        self._refcounter = 1
+        self._conn = conn
 
     @asyncio.coroutine
-    def make_connection(self):
+    def watcher(self):
+        while True:
+            yield asyncio.sleep(1)
+            log.info("Connection: allocated")
+
+    def increment_refcounter(self):
+        self._refcounter += 1
+
+    def channel(self):
+        return self._conn.channel()
+
+    def close(self):
+        self._refcounter -= 1
+        if self._refcounter <= 0:
+            self._conn.close()
+            self._conn = None
+
+
+class ConnectionManager(object):
+    def __init__(self, url):
+        self.url = url
+        self._connection = None
+        self._refcounter = 0
+
+    @asyncio.coroutine
+    def _make_connection(self):
         parse_result = urlparse(self.url)
 
         # Parse host & user/password
@@ -45,6 +73,42 @@ class EventsQueue(base.EventsQueue):
         vhost = parse_result.path
         return amqp.Connection(host=host, userid=user,
                                password=password, virtual_host=vhost)
+
+    def acquire(self):
+        self._refcounter += 1
+        if not self._connection:
+            self._connection = self._make_connection()
+        return self._connection
+
+    def release(self, connection):
+        if connection != self._connection:
+            return connection.close()
+
+        self._refcounter -= 1
+
+        if self._refcounter == 0:
+            self._connection.close()
+            self._connection = None
+
+
+class EventsQueue(base.EventsQueue):
+    """
+    Public abstraction.
+    """
+    def __init__(self, url):
+        self.url = url
+
+
+    @asyncio.coroutine
+    def make_connection(self):
+        if not hasattr(self, "__connection"):
+            conn = Connection(self._make_connection())
+        else:
+            conn = getattr(self, "__connection")
+            conn.increment_refcounter()
+
+        setattr(self, "__connection", conn)
+        return conn
 
     @asyncio.coroutine
     def subscribe(self, routing_key:str, buffer_size:int=10):

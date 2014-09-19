@@ -38,3 +38,20 @@ class WebSocketHandler(object, metaclass=abc.ABCMeta):
     def on_close(self, ws):
         pass
 
+
+# import asyncio
+
+# class KeepAliveWebSocketHandler(WebSocketHandler, metaclass=abc.ABCMeta):
+#     def on_initialize(self, config):
+#         self.last_pong = time.time()
+#         self.keepalive_loop
+
+#     def _keepalive_ventilator(self):
+#         while True:
+#             yield from asyncio.sleep(2)
+#             self.ws.ping()
+
+#     @abc.abstractmethod
+#     def on_stop(self, ws):
+#         pass
+

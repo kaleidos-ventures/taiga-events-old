@@ -202,20 +202,6 @@ class ConnectionHandler(object):
 
 
 class EventsHandler(ws.WebSocketHandler):
-    """
-    This handler wants receive first message
-    containing: authentication token, project id and
-    object type.
-
-    Simple example of received data:
-
-    {"token": "1233456789qwertyyuuoip",
-     "project": "1"}
-
-    If received token is invalid or user is not member
-    of any project, websocket is closed.
-    """
-
     def on_initialize(self, config:dict):
         self.config = config
 
