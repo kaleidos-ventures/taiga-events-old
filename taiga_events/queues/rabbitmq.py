@@ -20,36 +20,15 @@ RabbitSubscription = namedtuple("RabbitSubscription", ["conn", "queue", "rcvloop
 ## Low level RabbitMQ connection primitives adapted
 ## for work with asyncio
 
-
-class Connection(object):
-    """
-    Refcounted AMQP connection abstraction.
-    """
-
-    def __init__(self, conn):
-        self._refcounter = 1
-        self._conn = conn
-
-    @asyncio.coroutine
-    def watcher(self):
-        while True:
-            yield asyncio.sleep(1)
-            log.info("Connection: allocated")
-
-    def increment_refcounter(self):
-        self._refcounter += 1
-
-    def channel(self):
-        return self._conn.channel()
-
-    def close(self):
-        self._refcounter -= 1
-        if self._refcounter <= 0:
-            self._conn.close()
-            self._conn = None
-
-
 class ConnectionManager(object):
+    __instance = None
+
+    def __new__(cls, *args, **kwargs):
+        if cls.__instance is None:
+            cls.__instance = super().__new__(cls, *args, **kwargs)
+
+        return cls.__instance
+
     def __init__(self, url):
         self.url = url
         self._connection = None
@@ -85,7 +64,6 @@ class ConnectionManager(object):
             return connection.close()
 
         self._refcounter -= 1
-
         if self._refcounter == 0:
             self._connection.close()
             self._connection = None
@@ -96,8 +74,7 @@ class EventsQueue(base.EventsQueue):
     Public abstraction.
     """
     def __init__(self, url):
-        self.url = url
-
+        self._connections = ConnectionManager(url)
 
     @asyncio.coroutine
     def make_connection(self):
