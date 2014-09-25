@@ -20,15 +20,15 @@ RabbitSubscription = namedtuple("RabbitSubscription", ["conn", "queue", "rcvloop
 ## Low level RabbitMQ connection primitives adapted
 ## for work with asyncio
 
-class EventsQueue(base.EventsQueue):
-    """
-    Public abstraction.
-    """
+class ConnectionManager(object):
     def __init__(self, url):
-        self.url = url
+        log.debug("Initializing RabbitMQ connection manager.")
 
-    @asyncio.coroutine
-    def make_connection(self):
+        self.url = url
+        self._connection = None
+        self._refcounter = 0
+
+    def _make_connection(self):
         parse_result = urlparse(self.url)
 
         # Parse host & user/password
@@ -46,13 +46,36 @@ class EventsQueue(base.EventsQueue):
         return amqp.Connection(host=host, userid=user,
                                password=password, virtual_host=vhost)
 
+    def acquire(self):
+        self._refcounter += 1
+        if not self._connection:
+            self._connection = self._make_connection()
+        return self._connection
+
+    def release(self, connection):
+        if connection != self._connection:
+            return connection.close()
+
+        self._refcounter -= 1
+        if self._refcounter == 0:
+            self._connection.close()
+            self._connection = None
+
+
+class EventsQueue(base.EventsQueue):
+    """
+    Public abstraction.
+    """
+    def __init__(self, url):
+        self.connection_manager = ConnectionManager(url)
+
     @asyncio.coroutine
     def subscribe(self, routing_key:str, buffer_size:int=10):
         # Message buffer
         queue = asyncio.Queue(buffer_size)
 
         # RabbitMQ connection
-        conn = yield from self.make_connection()
+        conn = self.connection_manager.acquire()
 
         # Run message receiver
         rcvloop = asyncio.Task(self._receive_messages_loop(conn, routing_key, queue))
@@ -107,7 +130,7 @@ class EventsQueue(base.EventsQueue):
         (rconn, queue, rcvloop) = subscription
 
         def done_callback(n):
-            rconn.close()
+            self.connection_manager.release(rconn)
 
         rcvloop.cancel()
         rcvloop.add_done_callback(done_callback)

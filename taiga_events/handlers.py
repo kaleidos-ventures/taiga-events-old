@@ -5,7 +5,7 @@ import logging
 
 from . import repository as repo
 from . import signing
-from . import classloader
+from . import classloader as loader
 from . import types
 from . import websocket as ws
 
@@ -47,28 +47,27 @@ def is_same_session(identity:types.AuthMsg, message:dict) -> bool:
 
 
 class Subscription(object):
-    def __init__(self, identity, config, ws):
+    def __init__(self, identity, routing_key, queues, ws):
         self.identity = identity
-        self.config = config
+        self.queues = queues
+        self.routing_key = routing_key
         self.ws = ws
+
         self.loop = None
-        self.routing_key = None
 
     @asyncio.coroutine
-    def start(self, routing_key):
-        self.routing_key = routing_key
+    def start(self):
         self.loop = asyncio.Task(self._subscription_ventilator())
 
     @asyncio.coroutine
     def stop(self):
         if not self.loop:
             return
-
         self.loop.cancel()
 
     @asyncio.coroutine
     def _subscription_ventilator(self):
-        queues = classloader.load_queue_implementation(self.config)
+        queues = self.queues
         sub = yield from queues.subscribe(self.routing_key)
 
         try:
@@ -89,7 +88,7 @@ class Subscription(object):
         except asyncio.CancelledError:
             # Raised when connection is closed from browser
             # side. Nothing todo in this case.
-            log.debug("Connection closed by peer %s", self.ws.remote_ip,
+            log.debug("Subscription canceled %s by %s", self.routing_key, self.ws.remote_ip,
                       exc_info=False, stack_info=False)
 
         except Exception as e:
@@ -116,6 +115,7 @@ class ConnectionHandler(object):
         self.config = config
         self.authenticated = False
         self.subscriptions = {}
+        self.queues = loader.load_queue_implementation(config)
 
     @asyncio.coroutine
     def close(self):
@@ -123,53 +123,39 @@ class ConnectionHandler(object):
         for name, item in self.subscriptions.items():
             yield from item.stop()
 
+        # self.queues.close_all_connections()
+
     @asyncio.coroutine
     def parse_auth_message(self, message:dict) -> types.AuthMsg:
         """
         Parses first message received throught websocket
         connection (auth message).
         """
-        # Common data validation
         assert "token" in message, "handshake message should contain token"
         assert "sessionId" in message, "handshake message should contain sessionId"
 
         token_data = signing.loads(message["token"], key=self.config["secret_key"])
         return types.AuthMsg(message["token"], token_data["user_id"], message["sessionId"])
 
-    # @asyncio.coroutine
-    # def build_subscription_patterns(self, auth_msg:types.AuthMsg) -> dict:
-    #     conn = yield from repo.get_connection(self.config)
-    #     projects = yield from repo.get_user_project_id_list(conn, auth_msg.user_id)
-    #     return frozenset("project.{}.changes".format(x) for x in projects)
-
     @asyncio.coroutine
     def authenticate(self, message:dict):
         log.debug("Authenticating peer %s with: %s", self.ws.remote_ip, message)
         self.identity = yield from self.parse_auth_message(message)
-        # self.patters = yield from self.build_subscription_patterns(self.identity)
 
     @asyncio.coroutine
     def add_subscription(self, routing_key):
-        # TODO: improve permissions system
-        # if routing_key not in self.patters:
-        #     log.warning("Attemt to subscribe to forbidden routing key: {}".format(routing_key))
-        #     return None
-
         log.debug("Initializing subsciption to: {}".format(routing_key))
-        subscription = Subscription(self.identity, self.config, self.ws)
-        yield from subscription.start(routing_key)
+
+        subscription = Subscription(self.identity, routing_key, self.queues, self.ws)
+        yield from subscription.start()
         self.subscriptions[routing_key] = subscription
 
     @asyncio.coroutine
     def remove_subscription(self, routing_key):
-        # TODO: improve permissions system
-        # if routing_key not in self.patters:
-        #     log.warning("Attemt to unsubscribe to forbidden routing key: {}".format(routing_key))
-        #     return None
-
         if routing_key in self.subscriptions:
             subscription = self.subscriptions[routing_key]
-            yield from subscriptions.close()
+
+            yield from subscription.stop()
             del self.subscriptions[routing_key]
 
     @asyncio.coroutine
@@ -194,7 +180,7 @@ class ConnectionHandler(object):
         if cmd == "subscribe":
             routing_key = message.get("routing_key", None)
             yield from self.add_subscription(routing_key)
-        elif cmd == "ubsubscribe":
+        elif cmd == "unsubscribe":
             routing_key = message.get("routing_key", None)
             yield from self.remove_subscription(routing_key)
         else:
@@ -202,20 +188,6 @@ class ConnectionHandler(object):
 
 
 class EventsHandler(ws.WebSocketHandler):
-    """
-    This handler wants receive first message
-    containing: authentication token, project id and
-    object type.
-
-    Simple example of received data:
-
-    {"token": "1233456789qwertyyuuoip",
-     "project": "1"}
-
-    If received token is invalid or user is not member
-    of any project, websocket is closed.
-    """
-
     def on_initialize(self, config:dict):
         self.config = config
 

@@ -32,8 +32,11 @@ def start_app(application:Application, *, port:int=8888, join:bool=True):
     print("Now listening on: http://127.0.0.1:{0}".format(port), file=sys.stderr)
 
     if join:
-        loop = asyncio.get_event_loop()
-        loop.run_forever()
+        try:
+            loop = asyncio.get_event_loop()
+            loop.run_forever()
+        except KeyboardInterrupt:
+            loop.stop()
 
 
 def parse_config_file(path:str) -> dict:
