@@ -135,7 +135,7 @@ class ConnectionHandler(object):
         assert "sessionId" in message, "handshake message should contain sessionId"
 
         token_data = signing.loads(message["token"], key=self.config["secret_key"])
-        return types.AuthMsg(message["token"], token_data["user_id"], message["sessionId"])
+        return types.AuthMsg(message["token"], token_data["user_authentication_id"], message["sessionId"])
 
     @asyncio.coroutine
     def authenticate(self, message:dict):
